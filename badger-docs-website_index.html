@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Badger数据库源码分析文档</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    
+    <!-- Mermaid.js -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    
+    <!-- Prism.js for code highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    
+    <!-- Custom styles -->
+    <style>
+        :root {
+            --primary-color: #1e40af;
+            --secondary-color: #3b82f6;
+            --accent-color: #60a5fa;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --border-color: #e5e7eb;
+        }
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+        }
+        
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* 导航样式 */
+        .nav-item {
+            transition: all 0.2s ease;
+        }
+        
+        .nav-item:hover {
+            background-color: #f1f5f9;
+            color: var(--primary-color);
+        }
+        
+        .nav-item.active {
+            background-color: #dbeafe;
+            color: var(--primary-color);
+            border-right: 3px solid var(--primary-color);
+        }
+        
+        /* 代码块样式 */
+        pre[class*="language-"] {
+            border-radius: 8px;
+            margin: 1rem 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Mermaid图表样式 */
+        .mermaid {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: auto;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+        
+        /* 打印样式 */
+        @media print {
+            .sidebar, .mobile-menu-btn, .back-to-top {
+                display: none !important;
+            }
+            
+            .main-content {
+                margin-left: 0 !important;
+                max-width: none !important;
+            }
+            
+            .mermaid {
+                break-inside: avoid;
+            }
+        }
+        
+        /* 搜索高亮 */
+        .search-highlight {
+            background-color: #fef08a;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        /* 动画效果 */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* 图表容器 */
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+        
+        /* 章节样式 */
+        .section {
+            scroll-margin-top: 100px;
+        }
+        
+        /* 卡片样式 */
+        .info-card {
+            background: linear-gradient(135deg, #dbeafe 0%, #f0f9ff 100%);
+            border-left: 4px solid var(--primary-color);
+            padding: 1rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .warning-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+            border-left: 4px solid #f59e0b;
+            padding: 1rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .success-card {
+            background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%);
+            border-left: 4px solid #10b981;
+            padding: 1rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 移动端菜单按钮 -->
+    <button class="mobile-menu-btn fixed top-4 left-4 z-50 md:hidden bg-white p-2 rounded-lg shadow-lg" onclick="toggleSidebar()">
+        <span class="material-symbols-outlined">menu</span>
+    </button>
+    
+    <!-- 侧边栏 -->
+    <nav class="sidebar fixed left-0 top-0 h-full w-80 bg-white shadow-xl z-40 overflow-y-auto">
+        <div class="p-6 border-b border-gray-200">
+            <h1 class="text-xl font-bold text-gray-900 flex items-center">
+                <span class="material-symbols-outlined text-blue-600 mr-2">storage</span>
+                Badger数据库源码分析
+            </h1>
+            <p class="text-sm text-gray-600 mt-2">深入理解LSM树存储引擎</p>
+        </div>
+        
+        <!-- 搜索框 -->
+        <div class="p-4 border-b border-gray-200">
+            <div class="relative">
+                <input type="text" id="searchInput" placeholder="搜索内容..." 
+                       class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-400">search</span>
+            </div>
+        </div>
+        
+        <!-- 导航菜单 -->
+        <div class="p-4">
+            <ul class="space-y-2">
+                <li><a href="#overview" class="nav-item block px-4 py-2 rounded-lg">项目概述</a></li>
+                <li><a href="#architecture" class="nav-item block px-4 py-2 rounded-lg">核心存储架构</a></li>
+                <li><a href="#transaction" class="nav-item block px-4 py-2 rounded-lg">事务与一致性</a></li>
+                <li><a href="#performance" class="nav-item block px-4 py-2 rounded-lg">性能优化策略</a></li>
+                <li><a href="#components" class="nav-item block px-4 py-2 rounded-lg">关键组件解析</a></li>
+                <li><a href="#scalability" class="nav-item block px-4 py-2 rounded-lg">扩展性评估</a></li>
+                <li><a href="#dataflow" class="nav-item block px-4 py-2 rounded-lg">完整数据流分析</a></li>
+                <li>
+                    <div class="nav-item block px-4 py-2 rounded-lg cursor-pointer" onclick="toggleSubmenu('charts-submenu')">
+                        <span class="flex items-center justify-between">
+                            交互式流程图
+                            <span class="material-symbols-outlined text-sm">expand_more</span>
+                        </span>
+                    </div>
+                    <ul id="charts-submenu" class="ml-4 mt-2 space-y-1 hidden">
+                        <li><a href="#chart-system" class="nav-item block px-4 py-2 rounded-lg text-sm">系统架构图</a></li>
+                        <li><a href="#chart-write" class="nav-item block px-4 py-2 rounded-lg text-sm">写入流程图</a></li>
+                        <li><a href="#chart-read" class="nav-item block px-4 py-2 rounded-lg text-sm">读取流程图</a></li>
+                        <li><a href="#chart-transaction" class="nav-item block px-4 py-2 rounded-lg text-sm">事务生命周期图</a></li>
+                        <li><a href="#chart-compaction" class="nav-item block px-4 py-2 rounded-lg text-sm">压缩流程图</a></li>
+                        <li><a href="#chart-memory" class="nav-item block px-4 py-2 rounded-lg text-sm">内存到磁盘流图</a></li>
+                    </ul>
+                </li>
+                <li><a href="#insights" class="nav-item block px-4 py-2 rounded-lg">技术洞察</a></li>
+                <li><a href="#conclusion" class="nav-item block px-4 py-2 rounded-lg">总结</a></li>
+            </ul>
+        </div>
+    </nav>
+    
+    <!-- 主内容区域 -->
+    <main class="main-content ml-80 min-h-screen">
+        <!-- 顶部导航栏 -->
+        <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
+            <div class="max-w-7xl mx-auto px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <span class="material-symbols-outlined text-blue-600">description</span>
+                        <h2 class="text-lg font-semibold text-gray-900">技术文档</h2>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button onclick="toggleTheme()" class="p-2 rounded-lg hover:bg-gray-100" title="切换主题">
+                            <span class="material-symbols-outlined">light_mode</span>
+                        </button>
+                        <button onclick="printPage()" class="p-2 rounded-lg hover:bg-gray-100" title="打印页面">
+                            <span class="material-symbols-outlined">print</span>
+                        </button>
+                        <a href="https://github.com/hypermodeinc/badger" target="_blank" 
+                           class="p-2 rounded-lg hover:bg-gray-100" title="GitHub仓库">
+                            <span class="material-symbols-outlined">code</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- 内容区域 -->
+        <div class="max-w-7xl mx-auto px-6 py-8">
+            <!-- 项目概述 -->
+            <section id="overview" class="section fade-in">
+                <div class="mb-8">
+                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Badger数据库源码分析</h1>
+                    <p class="text-xl text-gray-600 mb-6">深入解析基于LSM树的高性能键值存储引擎</p>
+                    
+                    <div class="info-card">
+                        <h3 class="text-lg font-semibold mb-2 flex items-center">
+                            <span class="material-symbols-outlined mr-2">lightbulb</span>
+                            核心设计理念
+                        </h3>
+                        <ul class="space-y-2 text-gray-700">
+                            <li>• 基于WiscKey论文的LSM树与值日志分离架构</li>
+                            <li>• 针对SSD优化的存储设计</li>
+                            <li>• 支持ACID事务和SSI（可串行化快照隔离）</li>
+                            <li>• 纯Go实现，无CGO依赖</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <span class="material-symbols-outlined text-green-600 mr-2">check_circle</span>
+                            主要特性
+                        </h3>
+                        <ul class="space-y-2 text-gray-700">
+                            <li>• 高性能写入和合理的读取性能</li>
+                            <li>• 完整的ACID事务支持</li>
+                            <li>• 键值分离存储优化</li>
+                            <li>• 智能压缩策略</li>
+                            <li>• 内置加密和压缩支持</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <span class="material-symbols-outlined text-blue-600 mr-2">architecture</span>
+                            技术架构
+                        </h3>
+                        <ul class="space-y-2 text-gray-700">
+                            <li>• LSM树分层存储结构</li>
+                            <li>• SkipList内存表实现</li>
+                            <li>• Oracle时间戳管理</li>
+                            <li>• 后台异步压缩</li>
+                            <li>• WAL预写日志机制</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 核心存储架构 -->
+            <section id="architecture" class="section fade-in">
+                <h2 class="text-3xl font-bold text-gray-900 mb-6">核心存储架构分析</h2>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">LSM树实现</h3>
+                    <p class="text-gray-700 mb-4">
+                        Badger采用基于LSM树（Log-Structured Merge Tree）的存储架构，但与传统LSM树不同的是，
+                        它实现了键值分离设计，将大值存储在独立的Value Log中，而LSM树只存储键和小值。
+                    </p>
+                    
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
+                        <h4 class="text-lg font-semibold mb-4">数据结构组成</h4>
+                        
+                        <div class="mb-6">
+                            <h5 class="text-md font-semibold mb-2 code-font">MemTable（内存表）</h5>
+                            <p class="text-gray-700 mb-3">位置：<code class="code-font bg-gray-100 px-2 py-1 rounded">memtable.go:34-41</code></p>
+                            
+                            <pre><code class="language-go">type memTable struct {
+    sl         *skl.Skiplist  // 跳表实现
+    wal        *logFile       // 写前日志
+    maxVersion uint64         // 最大版本号
+    opt        Options
+    buf        *bytes.Buffer
+}</code></pre>
+                            
+                            <ul class="mt-4 space-y-2 text-gray-700">
+                                <li><strong>跳表（Skiplist）</strong>: 使用<code class="code-font">skl/skl.go</code>中实现的跳表作为内存中的有序数据结构</li>
+                                <li><strong>WAL机制</strong>: 每个memtable都有对应的WAL文件，确保崩溃恢复能力</li>
+                                <li><strong>版本控制</strong>: 通过maxVersion跟踪最新的时间戳版本</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <h5 class="text-md font-semibold mb-2 code-font">SSTable（磁盘表）</h5>
+                            <p class="text-gray-700 mb-3">位置：<code class="code-font bg-gray-100 px-2 py-1 rounded">table/table.go:86-109</code></p>
+                            
+                            <pre><code class="language-go">type Table struct {
+    sync.Mutex
+    *z.MmapFile
+    tableSize int
+    _index *fb.TableIndex    // FlatBuffers索引
+    _cheap *cheapIndex       // 轻量级索引
+    ref    atomic.Int32      // 引用计数
+    smallest, biggest []byte // 最小最大键
+    id                uint64 // 文件ID
+    // ... 其他字段
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">分层存储设计</h3>
+                    
+                    <div class="warning-card">
+                        <h4 class="text-lg font-semibold mb-2">分层存储解释</h4>
+                        <ul class="space-y-2 text-gray-700">
+                            <li><strong>L0层</strong>: 直接从MemTable刷盘而来，文件间可能有重叠</li>
+                            <li><strong>L1-Ln层</strong>: 通过压缩操作维护，文件间无重叠，有序排列</li>
+                            <li><strong>动态层级</strong>: 根据数据量动态调整层级大小和数量</li>
+                        </ul>
+                    </div>
+                    
+                    <pre><code class="language-go">type levelsController struct {
+    nextFileID atomic.Uint64
+    l0stallsMs atomic.Int64
+    levels []*levelHandler  // 多层级处理器
+    kv     *DB
+    cstatus compactStatus   // 压缩状态
+}</code></pre>
+                </div>
+            </section>
+            
+            <!-- 事务与一致性 -->
+            <section id="transaction" class="section fade-in">
+                <h2 class="text-3xl font-bold text-gray-900 mb-6">事务与一致性机制</h2>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">ACID特性保证</h3>
+                    
+                    <div class="grid md:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <h4 class="text-lg font-semibold mb-4">原子性（Atomicity）</h4>
+                            <p class="text-gray-700 mb-3">通过事务标记机制实现：</p>
+                            <pre><code class="language-go">if keepTogether {
+    // 添加事务结束标记
+    e := &Entry{
+        Key:   y.KeyWithTs(txnKey, commitTs),
+        Value: []byte(strconv.FormatUint(commitTs, 10)),
+        meta:  bitFinTxn,  // 事务完成标记
+    }
+    entries = append(entries, e)
+}</code></pre>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <h4 class="text-lg font-semibold mb-4">一致性（Consistency）</h4>
+                            <p class="text-gray-700 mb-3">通过Oracle时间戳机制保证：</p>
+                            <pre><code class="language-go">type oracle struct {
+    isManaged       bool
+    detectConflicts bool
+    sync.Mutex
+    nextTxnTs       uint64      // 下一个事务时间戳
+    txnMark         *y.WaterMark // 事务水位标记
+    discardTs       uint64       // 丢弃时间戳
+    // ... 其他字段
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">SSI隔离级别实现</h3>
+                    
+                    <div class="info-card">
+                        <h4 class="text-lg font-semibold mb-2">冲突检测机制</h4>
+                        <p class="text-gray-700 mb-3">
+                            Badger实现了可串行化快照隔离（SSI），通过检测读写冲突来保证事务的可串行化。
+                        </p>
+                    </div>
+                    
+                    <pre><code class="language-go">func (o *oracle) hasConflict(txn *Txn) bool {
+    if len(txn.reads) == 0 {
+        return false
+    }
+    
+    for _, committedTxn := range o.committedTxns {
+        // 检查已提交事务的时间戳
+        if committedTxn.ts <= txn.readTs {
+            continue
+        }
+        
+        // 检查读写冲突
+        for _, ro := range txn.reads {
+            if _, has := committedTxn.conflictKeys[ro]; has {
+                return true
+            }
+        }
+    }
+    return false
+}</code></pre>
+                </div>
+            </section>
+            
+            <!-- 性能优化策略 -->
+            <section id="performance" class="section fade-in">
+                <h2 class="text-3xl font-bold text-gray-900 mb-6">性能优化策略</h2>
+                
+                <div class="grid md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <span class="material-symbols-outlined text-blue-600 mr-2">storage</span>
+                            磁盘IO优化
+                        </h3>
+                        <ul class="space-y-2 text-gray-700">
+                            <li>• 批量写入机制</li>
+                            <li>• 顺序写入优化</li>
+                            <li>• 压缩算法支持</li>
+                            <li>• 预读策略</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <span class="material-symbols-outlined text-green-600 mr-2">memory</span>
+                            内存管理
+                        </h3>
+                        <ul class="space-y-2 text-gray-700">
+                            <li>• 多级缓存策略</li>
+                            <li>• 对象池机制</li>
+                            <li>• Arena分配器</li>
+                            <li>• 引用计数管理</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <span class="material-symbols-outlined text-orange-600 mr-2">speed</span>
+                            并发控制
+                        </h3>
+                        <ul class="space-y-2 text-gray-700">
+                            <li>• 读写锁机制</li>
+                            <li>• 原子操作优化</li>
+                            <li>• 协程池管理</li>
+                            <li>• 无锁数据结构</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">批量写入机制</h3>
+                    <p class="text-gray-700 mb-4">
+                        WriteBatch提供了高效的批量写入接口，通过限流控制和异步处理提升写入性能。
+                    </p>
+                    
+                    <pre><code class="language-go">type WriteBatch struct {
+    sync.Mutex
+    txn      *Txn
+    db       *DB
+    throttle *y.Throttle  // 限流控制
+    err      atomic.Value
+    isManaged bool
+    commitTs  uint64
+    finished  bool
+}
+
+func (db *DB) NewWriteBatch() *WriteBatch {
+    return &WriteBatch{
+        db:        db,
+        isManaged: false,
+        txn:       db.newTransaction(true, false),
+        throttle:  y.NewThrottle(16),  // 16个并发写入
+    }
+}</code></pre>
+                </div>
+            </section>
+            
+            <!-- 关键组件解析 -->
+            <section id="components" class="section fade-in">
+                <h2 class="text-3xl font-bold text-gray-900 mb-6">关键组件解析</h2>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">索引结构实现</h3>
+                    
+                    <div class="grid md:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <h4 class="text-lg font-semibold mb-4">布隆过滤器</h4>
+                            <p class="text-gray-700 mb-3">
+                                位置：<code class="code-font bg-gray-100 px-2 py-1 rounded">y/bloom.go:9-10</code>
+                            </p>
+                            <pre><code class="language-go">type Filter []byte</code></pre>
+                            <p class="text-gray-700 mt-3">用于快速判断键是否可能存在，减少磁盘IO。</p>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <h4 class="text-lg font-semibold mb-4">FlatBuffers索引</h4>
+                            <p class="text-gray-700 mb-3">
+                                使用FlatBuffers序列化格式：
+                            </p>
+                            <pre><code class="language-go">_index *fb.TableIndex // Nil if encryption is enabled</code></pre>
+                            <p class="text-gray-700 mt-3">提供高效的索引访问性能。</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Compaction过程分析</h3>
+                    
+                    <div class="success-card">
+                        <h4 class="text-lg font-semibold mb-2">压缩触发条件</h4>
+                        <ul class="space-y-2 text-gray-700">
+                            <li>• <strong>L0表数量超限</strong>: 当L0层表数量超过配置阈值时触发</li>
+                            <li>• <strong>层级大小超限</strong>: 当某层大小超过目标大小时触发</li>
+                            <li>• <strong>定时检查</strong>: 每50ms检查一次是否需要压缩</li>
+                            <li>• <strong>手动触发</strong>: 通过API手动触发压缩</li>
+                        </ul>
+                    </div>
+                    
+                    <pre><code class="language-go">type compactionPriority struct {
+    level        int
+    score        float64      // 压缩分数
+    adjusted     float64
+    dropPrefixes [][]byte
+    t            targets
+}</code></pre>
+                </div>
+            </section>
+            
+            <!-- 扩展性与局限性评估 -->
+            <section id="scalability" class="section fade-in">
+                <h2 class="text-3xl font-bold text-gray-900 mb-6">扩展性与局限性评估</h2>
+                
+                <div class="grid md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold mb-4 text-green-600">支持的扩展功能</h3>
+                        <ul class="space-y-3 text-gray-700">
+                            <li>
+                                <strong>数据加密</strong>
+                                <p class="text-sm text-gray-600">支持AES加密，密钥轮换，16/24/32字节密钥长度</p>
+                            </li>
+                            <li>
+                                <strong>TTL支持</strong>
+                                <p class="text-sm text-gray-600">时间到期自动删除机制</p>
+                            </li>
+                            <li>
+                                <strong>备份恢复</strong>
+                                <p class="text-sm text-gray-600">增量备份支持，跨版本恢复</p>
+                            </li>
+                            <li>
+                                <strong>流式写入</strong>
+                                <p class="text-sm text-gray-600">StreamWriter支持大批量数据导入</p>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold mb-4 text-red-600">架构瓶颈分析</h3>
+                        <ul class="space-y-3 text-gray-700">
+                            <li>
+                                <strong>写放大问题</strong>
+                                <p class="text-sm text-gray-600">LSM树天然的写放大特性，多层压缩导致的IO放大</p>
+                            </li>
+                            <li>
+                                <strong>读取延迟</strong>
+                                <p class="text-sm text-gray-600">需要查询多个层级，布隆过滤器误判导致的额外IO</p>
+                            </li>
+                            <li>
+                                <strong>内存使用</strong>
+                                <p class="text-sm text-gray-600">MemTable和缓存占用大量内存，压缩过程中的临时内存开销</p>
+                            </li>
+                            <li>
+                                <strong>并发限制</strong>
+                                <p class="text-sm text-gray-600">单个数据库实例的并发写入受限，大事务可能阻塞其他操作</p>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">适用场景分析</h3>
+                    
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="success-card">
+                            <h4 class="text-lg font-semibold mb-3">适合场景</h4>
+                            <ul class="space-y-2 text-gray-700">
+                                <li>• 嵌入式应用</li>
+                                <li>• 高写入吞吐量需求</li>
+                                <li>• 需要事务保证的KV存储</li>
+                                <li>• Go语言生态系统</li>
+                                <li>• SSD存储环境</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="warning-card">
+                            <h4 class="text-lg font-semibold mb-3">不适合场景</h4>
+                            <ul class="space-y-2 text-gray-700">
+                                <li>• 需要分布式部署</li>
+                                <li>• 主要是随机读取工作负载</li>
+                                <li>• 内存资源极度受限</li>
+                                <li>• 需要复杂查询功能</li>
+                                <li>• 传统机械硬盘环境</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 完整数据流分析 -->
+            <section id="dataflow" class="section fade-in">
+                <h2 class="text-3xl font-bold text-gray-900 mb-6">完整数据流分析</h2>
+                
+                <div class="info-card mb-8">
+                    <h3 class="text-lg font-semibold mb-2">数据流分析概述</h3>
+                    <p class="text-gray-700">
+                        本节详细分析了Badger数据库从API入口到底层存储的完整数据流转过程，
+                        包含具体的函数调用链、关键组件交互机制以及可视化流程图，
+                        为构建类似项目提供深入的技术洞察。
+                    </p>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">系统整体架构</h3>
+                    <p class="text-gray-700 mb-4">
+                        Badger采用基于LSM树的存储架构，结合WiscKey论文的键值分离设计，
+                        实现了高效的写入性能和合理的读取性能。
+                    </p>
+                    
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
+                        <h4 class="text-lg font-semibold mb-4">架构特点</h4>
+                        <ul class="space-y-2 text-gray-700">
+                            <li><strong>用户API层</strong>：提供简洁的事务接口，支持Update/View模式</li>
+                            <li><strong>事务管理层</strong>：实现SSI隔离级别，提供ACID保证</li>
+                            <li><strong>内存存储层</strong>：基于SkipList的MemTable，支持WAL持久化</li>
+                            <li><strong>持久化层</strong>：分层LSM树结构，L0层允许重叠，L1+层有序无重叠</li>
+                            <li><strong>后台处理</strong>：异步压缩、垃圾回收和刷盘操作</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 交互式流程图 -->
+            <section id="chart-system" class="section fade-in">
+                <h2 class="text-3xl font-bold text-gray-900 mb-6">交互式流程图</h2>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">系统架构图</h3>
+                    <div class="chart-container">
+                        <div class="mermaid" id="system-architecture">
+graph TB
+    %% 用户API层
+    subgraph "用户API层"
+        API["用户API"]
+        Update["db.Update()"]
+        View["db.View()"]
+        Get["txn.Get()"]
+        Set["txn.Set()"]
+        Delete["txn.Delete()"]
+    end
+
+    %% 事务层
+    subgraph "事务管理层"
+        TxnMgr["事务管理器"]
+        Oracle["Oracle时间戳管理"]
+        ConflictDet["冲突检测"]
+        MVCC["MVCC控制"]
+    end
+
+    %% 内存层
+    subgraph "内存存储层"
+        ActiveMT["活跃MemTable"]
+        ImmMT["不可变MemTable队列"]
+        WAL["预写日志WAL"]
+        Cache["块缓存/索引缓存"]
+    end
+
+    %% 持久化层
+    subgraph "持久化存储层"
+        L0["L0层SSTable"]
+        L1["L1层SSTable"]
+        Ln["Ln层SSTable"]
+        VLog["Value Log"]
+        Manifest["Manifest文件"]
+    end
+
+    %% 后台处理
+    subgraph "后台处理"
+        Compactor["压缩器"]
+        GC["垃圾回收"]
+        Flusher["刷盘器"]
+    end
+
+    %% 连接关系
+    API --> Update
+    API --> View
+    Update --> Set
+    Update --> Delete
+    View --> Get
+
+    Set --> TxnMgr
+    Delete --> TxnMgr
+    Get --> TxnMgr
+
+    TxnMgr --> Oracle
+    TxnMgr --> ConflictDet
+    TxnMgr --> MVCC
+
+    TxnMgr --> ActiveMT
+    TxnMgr --> ImmMT
+    ActiveMT --> WAL
+    
+    Get --> Cache
+    Get --> ActiveMT
+    Get --> ImmMT
+    Get --> L0
+    Get --> L1
+    Get --> Ln
+
+    ImmMT --> Flusher
+    Flusher --> L0
+
+    L0 --> Compactor
+    L1 --> Compactor
+    Compactor --> L1
+    Compactor --> Ln
+
+    ActiveMT --> VLog
+    VLog --> GC
+    
+    Compactor --> Manifest
+    Flusher --> Manifest
+
+    style API fill:#e1f5fe
+    style TxnMgr fill:#f3e5f5
+    style ActiveMT fill:#fff3e0
+    style L0 fill:#e8f5e8
+    style Compactor fill:#fce4ec
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="chart-write" class="section fade-in">
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">写入流程图</h3>
+                    <div class="chart-container">
+                        <div class="mermaid" id="write-flow">
+flowchart TD
+    %% 用户写入入口
+    Start["用户调用 db.Update()"] --> CreateTxn["创建读写事务 NewTransaction(true)"]
+    
+    %% 事务操作
+    CreateTxn --> UserFunc["执行用户函数 fn(txn)"]
+    UserFunc --> SetOp["txn.Set(key, value)"]
+    SetOp --> ModifyEntry["txn.modify(entry)"]
+    
+    %% 事务内部处理
+    ModifyEntry --> ValidateEntry["验证Entry大小和权限"]
+    ValidateEntry --> ConflictTrack["记录冲突检测键 conflictKeys[hash]"]
+    ConflictTrack --> PendingWrites["加入待写入队列 pendingWrites[key]"]
+    
+    %% 提交流程
+    PendingWrites --> CommitCall["txn.Commit()"]
+    CommitCall --> CommitPrecheck["提交前检查 commitPrecheck()"]
+    CommitPrecheck --> CommitAndSend["commitAndSend()"]
+    
+    %% Oracle时间戳管理
+    CommitAndSend --> GetCommitTs["Oracle获取提交时间戳 newCommitTs()"]
+    GetCommitTs --> ConflictCheck{"检查读写冲突"}
+    ConflictCheck -->|冲突| ReturnConflict["返回 ErrConflict"]
+    ConflictCheck -->|无冲突| ProcessEntries["处理Entry列表"]
+    
+    %% Entry处理
+    ProcessEntries --> AddTimestamp["为Key添加时间戳后缀 KeyWithTs()"]
+    AddTimestamp --> AddTxnMarker["添加事务标记 bitTxn"]
+    AddTxnMarker --> SendToWriteCh["发送到写入通道 sendToWriteCh()"]
+    
+    %% 写入通道处理
+    SendToWriteCh --> WriteChQueue["写入通道队列 writeCh"]
+    WriteChQueue --> DoWrites["后台写入协程 doWrites()"]
+    DoWrites --> BatchRequests["批量处理请求 writeRequests()"]
+    
+    %% Value Log写入
+    BatchRequests --> WriteVLog["写入Value Log vlog.write()"]
+    WriteVLog --> CheckThreshold{"值大小 > ValueThreshold?"}
+    CheckThreshold -->|是| StoreInVLog["存储到Value Log"]
+    CheckThreshold -->|否| StoreInline["内联存储"]
+    
+    %% MemTable写入
+    StoreInVLog --> WriteToLSM["写入LSM树 writeToLSM()"]
+    StoreInline --> WriteToLSM
+    WriteToLSM --> MemTablePut["MemTable.Put()"]
+    MemTablePut --> WALWrite["写入WAL日志"]
+    WALWrite --> SkipListPut["写入SkipList"]
+    
+    %% 内存管理
+    SkipListPut --> CheckMemFull{"MemTable已满?"}
+    CheckMemFull -->|否| WriteComplete["写入完成"]
+    CheckMemFull -->|是| FlushMemTable["刷新MemTable"]
+    
+    %% 刷盘流程
+    FlushMemTable --> MoveToImm["移动到不可变队列 imm"]
+    MoveToImm --> CreateNewMem["创建新的MemTable"]
+    CreateNewMem --> FlushToDisk["后台刷盘 flushMemtable()"]
+    FlushToDisk --> BuildL0Table["构建L0 SSTable"]
+    BuildL0Table --> AddToL0["添加到L0层"]
+    AddToL0 --> WriteComplete
+    
+    %% 样式
+    style Start fill:#e3f2fd
+    style CreateTxn fill:#f3e5f5
+    style WriteToLSM fill:#fff3e0
+    style FlushToDisk fill:#e8f5e8
+    style WriteComplete fill:#e0f2f1
+                        </div>
+                    </div>
+                    
+                    <div class="info-card mt-4">
+                        <h4 class="text-lg font-semibold mb-2">写入操作关键调用链</h4>
+                        <ol class="space-y-1 text-gray-700">
+                            <li>1. <code class="code-font">db.Update(fn)</code> → <code class="code-font">db.NewTransaction(true)</code> → <code class="code-font">fn(txn)</code></li>
+                            <li>2. <code class="code-font">txn.Set(key, val)</code> → <code class="code-font">txn.SetEntry(entry)</code> → <code class="code-font">txn.modify(entry)</code></li>
+                            <li>3. <code class="code-font">txn.Commit()</code> → <code class="code-font">txn.commitAndSend()</code> → <code class="code-font">orc.newCommitTs(txn)</code></li>
+                            <li>4. <code class="code-font">db.sendToWriteCh(entries)</code> → <code class="code-font">db.doWrites()</code> → <code class="code-font">db.writeRequests()</code></li>
+                            <li>5. <code class="code-font">db.writeToLSM(batch)</code> → <code class="code-font">mt.Put(key, value)</code> → <code class="code-font">mt.wal.writeEntry()</code></li>
+                            <li>6. <code class="code-font">db.flushMemtable()</code> → <code class="code-font">db.handleMemTableFlush()</code> → <code class="code-font">db.lc.addLevel0Table()</code></li>
+                        </ol>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="chart-read" class="section fade-in">
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">读取流程图</h3>
+                    <div class="chart-container">
+                        <div class="mermaid" id="read-flow">
+flowchart TD
+    %% 用户读取入口
+    Start["用户调用 db.View()"] --> CreateReadTxn["创建只读事务 NewTransaction(false)"]
+    
+    %% 事务操作
+    CreateReadTxn --> SetReadTs["设置读取时间戳 readTs"]
+    SetReadTs --> UserFunc["执行用户函数 fn(txn)"]
+    UserFunc --> GetOp["txn.Get(key)"]
+    
+    %% 读取处理
+    GetOp --> ValidateKey["验证Key有效性"]
+    ValidateKey --> CheckPendingWrites{"检查事务内待写入"}
+    CheckPendingWrites -->|找到| ReturnFromCache["从事务缓存返回"]
+    CheckPendingWrites -->|未找到| AddReadKey["记录读取Key addReadKey()"]
+    
+    %% 数据库查找
+    AddReadKey --> CreateSeekKey["创建带时间戳的Key KeyWithTs()"]
+    CreateSeekKey --> DBGet["调用 db.get()"]
+    
+    %% MemTable查找
+    DBGet --> GetMemTables["获取MemTable列表 getMemTables()"]
+    GetMemTables --> SearchActiveMT["搜索活跃MemTable"]
+    SearchActiveMT --> CheckActiveResult{"在活跃MemTable中找到?"}
+    CheckActiveResult -->|找到且版本匹配| ReturnValue["返回值"]
+    CheckActiveResult -->|找到但版本不匹配| RecordMaxVersion["记录最大版本"]
+    CheckActiveResult -->|未找到| SearchImmMT["搜索不可变MemTable队列"]
+    
+    %% 不可变MemTable查找
+    SearchImmMT --> IterateImmTables["遍历imm队列"]
+    IterateImmTables --> CheckImmResult{"在imm中找到?"}
+    CheckImmResult -->|找到且版本匹配| ReturnValue
+    CheckImmResult -->|找到但版本不匹配| RecordMaxVersion
+    CheckImmResult -->|未找到| SearchLSM["搜索LSM树 lc.get()"]
+    
+    %% LSM树查找
+    SearchLSM --> SearchL0["搜索L0层"]
+    SearchL0 --> IterateL0Tables["遍历L0所有表(时间顺序)"]
+    IterateL0Tables --> CheckBloomFilter["检查布隆过滤器"]
+    CheckBloomFilter -->|可能存在| SearchInTable["在表中查找"]
+    CheckBloomFilter -->|不存在| NextL0Table["下一个L0表"]
+    SearchInTable --> CheckTableResult{"在表中找到?"}
+    CheckTableResult -->|找到| CheckValuePointer{"是否为值指针?"}
+    CheckTableResult -->|未找到| NextL0Table
+    NextL0Table --> MoreL0Tables{"还有L0表?"}
+    MoreL0Tables -->|是| IterateL0Tables
+    MoreL0Tables -->|否| SearchL1Plus["搜索L1+层"]
+    
+    %% L1+层查找
+    SearchL1Plus --> BinarySearchLevel["二分查找定位表"]
+    BinarySearchLevel --> CheckL1BloomFilter["检查布隆过滤器"]
+    CheckL1BloomFilter -->|可能存在| SearchInL1Table["在表中查找"]
+    CheckL1BloomFilter -->|不存在| NextLevel["下一层级"]
+    SearchInL1Table --> CheckL1Result{"在表中找到?"}
+    CheckL1Result -->|找到| CheckValuePointer
+    CheckL1Result -->|未找到| NextLevel
+    NextLevel --> MoreLevels{"还有更多层级?"}
+    MoreLevels -->|是| SearchL1Plus
+    MoreLevels -->|否| NotFound["返回 ErrKeyNotFound"]
+    
+    %% 值指针处理
+    CheckValuePointer -->|是值指针| ReadFromVLog["从Value Log读取 vlog.read()"]
+    CheckValuePointer -->|直接值| ReturnDirectValue["返回直接值"]
+    ReadFromVLog --> DecryptValue["解密值(如果加密)"]
+    DecryptValue --> ReturnValue
+    ReturnDirectValue --> ReturnValue
+    
+    %% 缓存处理
+    ReturnValue --> UpdateCache["更新块缓存"]
+    UpdateCache --> Complete["读取完成"]
+    
+    RecordMaxVersion --> SearchLSM
+    ReturnFromCache --> Complete
+    NotFound --> Complete
+    
+    %% 样式
+    style Start fill:#e3f2fd
+    style CreateReadTxn fill:#f3e5f5
+    style SearchActiveMT fill:#fff3e0
+    style SearchLSM fill:#e8f5e8
+    style ReturnValue fill:#e0f2f1
+    style NotFound fill:#ffebee
+                        </div>
+                    </div>
+                    
+                    <div class="success-card mt-4">
+                        <h4 class="text-lg font-semibold mb-2">读取性能优化策略</h4>
+                        <ul class="space-y-1 text-gray-700">
+                            <li>• <strong>布隆过滤器</strong>：快速排除不存在的键，减少磁盘IO</li>
+                            <li>• <strong>块缓存</strong>：缓存热点数据块，提高读取性能</li>
+                            <li>• <strong>索引缓存</strong>：缓存SSTable索引，加速键定位</li>
+                            <li>• <strong>分层查找</strong>：从新到旧逐层查找，利用数据局部性</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="chart-transaction" class="section fade-in">
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">事务生命周期图</h3>
+                    <div class="chart-container">
+                        <div class="mermaid" id="transaction-lifecycle">
+flowchart TD
+    %% 事务创建
+    Start["事务开始"] --> CreateTxn["NewTransaction(update)"]
+    CreateTxn --> SetReadTs["设置读取时间戳 readTs = oracle.readTs()"]
+    
+    %% 事务类型分支
+    SetReadTs --> TxnType{"事务类型"}
+    TxnType -->|只读| ReadOnlyTxn["只读事务"]
+    TxnType -->|读写| ReadWriteTxn["读写事务"]
+    
+    %% 只读事务流程
+    ReadOnlyTxn --> ReadOps["执行读取操作"]
+    ReadOps --> ReadFromSnapshot["从快照读取数据"]
+    ReadFromSnapshot --> ReadComplete["读取完成"]
+    ReadComplete --> DiscardReadTxn["txn.Discard()"]
+    
+    %% 读写事务流程
+    ReadWriteTxn --> InitConflictTracking["初始化冲突跟踪 conflictKeys"]
+    InitConflictTracking --> InitPendingWrites["初始化待写入队列 pendingWrites"]
+    
+    %% 事务操作阶段
+    InitPendingWrites --> TxnOperations["事务操作阶段"]
+    TxnOperations --> ReadWriteOps["读写操作"]
+    
+    %% 读操作处理
+    ReadWriteOps --> ReadOp["txn.Get()"]
+    ReadOp --> TrackReadKey["记录读取键 addReadKey()"]
+    TrackReadKey --> ReadData["读取数据"]
+    ReadData --> BackToOps["继续操作"]
+    
+    %% 写操作处理
+    ReadWriteOps --> WriteOp["txn.Set() / txn.Delete()"]
+    WriteOp --> ValidateWrite["验证写入"]
+    ValidateWrite --> AddToConflictKeys["添加到冲突键集合"]
+    AddToConflictKeys --> AddToPendingWrites["添加到待写入队列"]
+    AddToPendingWrites --> BackToOps
+    
+    %% 提交阶段
+    BackToOps --> CommitDecision{"准备提交"}
+    CommitDecision -->|继续操作| ReadWriteOps
+    CommitDecision -->|提交| CommitPhase["提交阶段"]
+    CommitDecision -->|放弃| DiscardTxn["txn.Discard()"]
+    
+    %% 提交流程
+    CommitPhase --> CommitPrecheck["提交前检查"]
+    CommitPrecheck --> AcquireWriteLock["获取写入锁 writeChLock"]
+    AcquireWriteLock --> GetCommitTs["获取提交时间戳 newCommitTs()"]
+    
+    %% Oracle冲突检测
+    GetCommitTs --> ConflictDetection["Oracle冲突检测"]
+    ConflictDetection --> CheckReadKeys["检查读取键是否被修改"]
+    CheckReadKeys --> ConflictResult{"冲突检测结果"}
+    ConflictResult -->|有冲突| ReleaseWriteLock["释放写入锁"]
+    ReleaseWriteLock --> ReturnConflict["返回 ErrConflict"]
+    ConflictResult -->|无冲突| ProcessCommit["处理提交"]
+    
+    %% 提交处理
+    ProcessCommit --> SetEntryVersions["设置Entry版本号"]
+    SetEntryVersions --> AddTxnMarkers["添加事务标记"]
+    AddTxnMarkers --> CreateTxnEndMarker["创建事务结束标记"]
+    CreateTxnEndMarker --> SendToWriteChannel["发送到写入通道"]
+    
+    %% 异步写入
+    SendToWriteChannel --> ReleaseWriteLockSuccess["释放写入锁"]
+    ReleaseWriteLockSuccess --> AsyncWrite["异步写入处理"]
+    AsyncWrite --> WriteToVLog["写入Value Log"]
+    WriteToVLog --> WriteToMemTable["写入MemTable"]
+    WriteToMemTable --> WriteToWAL["写入WAL"]
+    WriteToWAL --> CommitComplete["提交完成"]
+    
+    %% Oracle状态更新
+    CommitComplete --> UpdateOracle["更新Oracle状态"]
+    UpdateOracle --> DoneCommit["标记提交完成 doneCommit()"]
+    DoneCommit --> NotifyWaiters["通知等待者"]
+    
+    %% 事务清理
+    NotifyWaiters --> DiscardCommittedTxn["txn.Discard()"]
+    DiscardReadTxn --> TxnEnd["事务结束"]
+    DiscardTxn --> TxnEnd
+    DiscardCommittedTxn --> TxnEnd
+    ReturnConflict --> DiscardConflictTxn["txn.Discard()"]
+    DiscardConflictTxn --> TxnEnd
+    
+    %% 样式
+    style Start fill:#e3f2fd
+    style ReadOnlyTxn fill:#e8f5e8
+    style ReadWriteTxn fill:#fff3e0
+    style ConflictDetection fill:#fce4ec
+    style CommitComplete fill:#e0f2f1
+    style ReturnConflict fill:#ffebee
+    style TxnEnd fill:#f3e5f5
+                        </div>
+                    </div>
+                    
+                    <div class="info-card mt-4">
+                        <h4 class="text-lg font-semibold mb-2">Oracle核心机制</h4>
+                        <ul class="space-y-1 text-gray-700">
+                            <li>• <strong>readTs分配</strong>：为每个事务分配读取时间戳，确保快照隔离</li>
+                            <li>• <strong>commitTs分配</strong>：为提交事务分配递增的提交时间戳</li>
+                            <li>• <strong>冲突检测</strong>：检查读取键在事务期间是否被其他事务修改</li>
+                            <li>• <strong>水位标记</strong>：使用txnMark和readMark管理事务生命周期</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="chart-compaction" class="section fade-in">
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">压缩流程图</h3>
+                    <div class="chart-container">
+                        <div class="mermaid" id="compaction-flow">
+flowchart TD
+    %% 压缩触发
+    Start["压缩触发"] --> TriggerTypes{"触发类型"}
+    TriggerTypes -->|定时检查| PeriodicCheck["定时检查 50ms ticker"]
+    TriggerTypes -->|L0表数量| L0Overflow["L0表数量超限"]
+    TriggerTypes -->|层级大小| LevelSize["层级大小超限"]
+    TriggerTypes -->|手动触发| ManualTrigger["手动压缩"]
+    
+    %% 压缩优先级计算
+    PeriodicCheck --> CalcPriority["计算压缩优先级 pickCompactLevels()"]
+    L0Overflow --> CalcPriority
+    LevelSize --> CalcPriority
+    ManualTrigger --> CalcPriority
+    
+    %% 优先级计算详情
+    CalcPriority --> L0Priority["L0优先级 = 表数量 / NumLevelZeroTables"]
+    CalcPriority --> LnPriority["Ln优先级 = 当前大小 / 目标大小"]
+    L0Priority --> AdjustPriority["调整优先级 (PebbleDB算法)"]
+    LnPriority --> AdjustPriority
+    AdjustPriority --> SortByPriority["按调整后优先级排序"]
+    
+    %% 选择压缩任务
+    SortByPriority --> SelectCompaction["选择压缩任务"]
+    SelectCompaction --> CheckScore{"优先级 >= 1.0?"}
+    CheckScore -->|否| NoCompaction["无需压缩"]
+    CheckScore -->|是| DoCompaction["执行压缩 doCompact()"]
+    
+    %% 压缩类型判断
+    DoCompaction --> CompactionType{"压缩类型"}
+    CompactionType -->|L0->Lbase| L0Compaction["L0压缩"]
+    CompactionType -->|Li->Li+1| LevelCompaction["层级压缩"]
+    CompactionType -->|Lmax->Lmax| LmaxCompaction["最大层内压缩"]
+    
+    %% L0压缩流程
+    L0Compaction --> SelectL0Tables["选择L0表 (所有表)"]
+    SelectL0Tables --> FindTargetLevel["确定目标层级 Lbase"]
+    FindTargetLevel --> SelectOverlapTables["选择重叠表"]
+    SelectOverlapTables --> CreateCompactDef["创建压缩定义 compactDef"]
+    
+    %% 层级压缩流程
+    LevelCompaction --> SelectSourceTable["选择源表 (单个表)"]
+    SelectSourceTable --> FindOverlapNext["查找下一层重叠表"]
+    FindOverlapNext --> CreateCompactDef
+    
+    %% Lmax压缩流程
+    LmaxCompaction --> SelectLmaxTables["选择最大层表"]
+    SelectLmaxTables --> CreateCompactDef
+    
+    %% 压缩执行
+    CreateCompactDef --> RunCompactDef["执行压缩定义 runCompactDef()"]
+    RunCompactDef --> AcquireLock["获取压缩锁"]
+    AcquireLock --> CheckConflict["检查表冲突"]
+    CheckConflict -->|有冲突| ReleaseLock["释放锁"]
+    ReleaseLock --> RetryLater["稍后重试"]
+    CheckConflict -->|无冲突| MarkTablesInUse["标记表正在使用"]
+    
+    %% 压缩构建
+    MarkTablesInUse --> CompactBuildTables["构建新表 compactBuildTables()"]
+    CompactBuildTables --> CreateIterators["创建迭代器"]
+    CreateIterators --> DetermineKeySplits["确定键范围分割"]
+    DetermineKeySplits --> ParallelSubcompact["并行子压缩 subcompact()"]
+    
+    %% 子压缩处理
+    ParallelSubcompact --> IterateKeys["遍历键值对"]
+    IterateKeys --> VersionFiltering["版本过滤"]
+    VersionFiltering --> DiscardOldVersions["丢弃旧版本"]
+    DiscardOldVersions --> HandleExpiredKeys["处理过期键"]
+    HandleExpiredKeys --> BuildNewTable["构建新SSTable"]
+    
+    %% 表构建
+    BuildNewTable --> WriteTableData["写入表数据"]
+    WriteTableData --> CreateBloomFilter["创建布隆过滤器"]
+    CreateBloomFilter --> CreateIndex["创建索引"]
+    CreateIndex --> FinalizeTable["完成表构建"]
+    
+    %% 并发控制
+    FinalizeTable --> WaitAllSubcompacts["等待所有子压缩完成"]
+    WaitAllSubcompacts --> SortNewTables["排序新表"]
+    SortNewTables --> UpdateManifest["更新Manifest文件"]
+    
+    %% Manifest更新
+    UpdateManifest --> CreateChangeSet["创建变更集 ManifestChangeSet"]
+    CreateChangeSet --> AddCreateChanges["添加新表创建记录"]
+    AddCreateChanges --> AddDeleteChanges["添加旧表删除记录"]
+    AddDeleteChanges --> ApplyChanges["应用变更到Manifest"]
+    
+    %% 层级更新
+    ApplyChanges --> UpdateLevelHandler["更新层级处理器"]
+    UpdateLevelHandler --> AddNewTables["添加新表到目标层"]
+    AddNewTables --> RemoveOldTables["从源层移除旧表"]
+    RemoveOldTables --> UpdateLevelStats["更新层级统计"]
+    
+    %% 清理工作
+    UpdateLevelStats --> DecrRefOldTables["减少旧表引用计数"]
+    DecrRefOldTables --> DeleteOldFiles["删除旧表文件"]
+    DeleteOldFiles --> UpdateDiscardStats["更新丢弃统计"]
+    UpdateDiscardStats --> ReleaseFinalLock["释放压缩锁"]
+    
+    %% 完成
+    ReleaseFinalLock --> CompactionComplete["压缩完成"]
+    NoCompaction --> WaitNextCycle["等待下一轮检查"]
+    RetryLater --> WaitNextCycle
+    CompactionComplete --> WaitNextCycle
+    WaitNextCycle --> PeriodicCheck
+    
+    %% 样式
+    style Start fill:#e3f2fd
+    style CalcPriority fill:#f3e5f5
+    style DoCompaction fill:#fff3e0
+    style ParallelSubcompact fill:#e8f5e8
+    style UpdateManifest fill:#fce4ec
+    style CompactionComplete fill:#e0f2f1
+    style NoCompaction fill:#f5f5f5
+                        </div>
+                    </div>
+                    
+                    <div class="warning-card mt-4">
+                        <h4 class="text-lg font-semibold mb-2">压缩优先级算法</h4>
+                        <ul class="space-y-1 text-gray-700">
+                            <li>• <strong>L0层</strong>：优先级 = 当前表数量 / 配置的L0表数量阈值</li>
+                            <li>• <strong>其他层</strong>：优先级 = 当前层大小 / 目标层大小</li>
+                            <li>• <strong>动态调整</strong>：借鉴PebbleDB算法，根据下层压力调整上层优先级</li>
+                            <li>• <strong>并发控制</strong>：多个压缩器并发执行，worker 0优先处理L0压缩</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="chart-memory" class="section fade-in">
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">内存到磁盘数据流图</h3>
+                    <div class="chart-container">
+                        <div class="mermaid" id="memory-to-disk-flow">
+flowchart TD
+    %% 数据写入入口
+    Start["数据写入请求"] --> ValueSizeCheck{"值大小检查"}
+    ValueSizeCheck -->|> ValueThreshold| SeparateStorage["键值分离存储"]
+    ValueSizeCheck -->|<= ValueThreshold| InlineStorage["内联存储"]
+    
+    %% 键值分离存储路径
+    SeparateStorage --> WriteValueLog["写入Value Log"]
+    WriteValueLog --> VLogAppend["追加到vlog文件"]
+    VLogAppend --> VLogSync["同步vlog (可选)"]
+    VLogSync --> CreateValuePointer["创建值指针 valuePointer"]
+    CreateValuePointer --> WriteKeyToMem["写入Key+指针到内存"]
+    
+    %% 内联存储路径
+    InlineStorage --> WriteKeyToMem["写入Key+Value到内存"]
+    
+    %% 内存写入流程
+    WriteKeyToMem --> WALWrite["写入WAL日志"]
+    WALWrite --> WALEncode["编码Entry到WAL"]
+    WALEncode --> WALFlush["刷新WAL到磁盘"]
+    WALFlush --> SkipListWrite["写入SkipList"]
+    SkipListWrite --> UpdateMemSize["更新内存使用"]
+    
+    %% 内存管理
+    UpdateMemSize --> CheckMemFull{"MemTable已满?"}
+    CheckMemFull -->|否| WriteComplete["写入完成"]
+    CheckMemFull -->|是| TriggerFlush["触发刷盘"]
+    
+    %% 刷盘流程
+    TriggerFlush --> MoveToImmutable["移动到不可变队列"]
+    MoveToImmutable --> CreateNewMemTable["创建新MemTable"]
+    CreateNewMemTable --> FlushToL0["刷盘到L0层"]
+    
+    %% L0层构建
+    FlushToL0 --> CreateIterator["创建MemTable迭代器"]
+    CreateIterator --> BuildSSTable["构建SSTable"]
+    BuildSSTable --> WriteDataBlocks["写入数据块"]
+    WriteDataBlocks --> CreateBloomFilter["创建布隆过滤器"]
+    CreateBloomFilter --> WriteIndexBlock["写入索引块"]
+    WriteIndexBlock --> WriteMetaBlock["写入元数据块"]
+    WriteMetaBlock --> WriteFooter["写入文件尾部"]
+    WriteFooter --> SyncSSTable["同步SSTable到磁盘"]
+    
+    %% L0层管理
+    SyncSSTable --> AddToL0["添加到L0层"]
+    AddToL0 --> UpdateManifest["更新Manifest文件"]
+    UpdateManifest --> DeleteWAL["删除对应WAL文件"]
+    DeleteWAL --> L0Complete["L0写入完成"]
+    
+    %% 压缩触发
+    L0Complete --> CheckL0Count{"L0表数量检查"}
+    CheckL0Count -->|< 阈值| FlushComplete["刷盘完成"]
+    CheckL0Count -->|>= 阈值| TriggerCompaction["触发压缩"]
+    
+    %% 压缩流程
+    TriggerCompaction --> SelectTables["选择压缩表"]
+    SelectTables --> MergeSort["归并排序"]
+    MergeSort --> VersionFiltering["版本过滤"]
+    VersionFiltering --> BuildNewL1["构建新L1表"]
+    BuildNewL1 --> WriteL1SSTable["写入L1 SSTable"]
+    WriteL1SSTable --> UpdateL1Level["更新L1层"]
+    UpdateL1Level --> RemoveOldL0["移除旧L0表"]
+    RemoveOldL0 --> CompactionComplete["压缩完成"]
+    
+    %% 多层压缩
+    CompactionComplete --> CheckLevelSize{"检查层级大小"}
+    CheckLevelSize -->|超限| TriggerNextLevel["触发下层压缩"]
+    CheckLevelSize -->|正常| AllComplete["全部完成"]
+    TriggerNextLevel --> SelectNextLevelTables["选择下层表"]
+    SelectNextLevelTables --> MergeSort
+    
+    %% 样式
+    style Start fill:#e3f2fd
+    style SeparateStorage fill:#fff3e0
+    style InlineStorage fill:#f3e5f5
+    style TriggerFlush fill:#fce4ec
+    style BuildSSTable fill:#e8f5e8
+    style TriggerCompaction fill:#fff8e1
+    style AllComplete fill:#e0f2f1
+                        </div>
+                    </div>
+                    
+                    <div class="success-card mt-4">
+                        <h4 class="text-lg font-semibold mb-2">WiscKey键值分离优势</h4>
+                        <ul class="space-y-1 text-gray-700">
+                            <li>• <strong>减少写放大</strong>：大值存储在Value Log中，LSM树只存储键和小值</li>
+                            <li>• <strong>提高压缩效率</strong>：压缩时只需处理键和指针，不涉及大值数据</li>
+                            <li>• <strong>并行读取</strong>：键查找和值读取可以并行进行</li>
+                            <li>• <strong>垃圾回收</strong>：独立的Value Log GC机制，回收无效数据</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 技术洞察 -->
+            <section id="insights" class="section fade-in">
+                <h2 class="text-3xl font-bold text-gray-900 mb-6">构建类似项目的技术洞察</h2>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">架构设计原则</h3>
+                    
+                    <div class="info-card">
+                        <h4 class="text-lg font-semibold mb-2">核心设计原则</h4>
+                        <ul class="space-y-2 text-gray-700">
+                            <li><strong>分层存储</strong>：内存层、L0层、L1+层各司其职</li>
+                            <li><strong>异步处理</strong>：写入、刷盘、压缩都采用异步处理</li>
+                            <li><strong>并发控制</strong>：细粒度锁和无锁数据结构</li>
+                            <li><strong>错误处理</strong>：完善的错误处理和恢复机制</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold mb-4">关键技术选择</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-800">数据结构选择</h4>
+                                <ul class="text-sm text-gray-700 mt-2 space-y-1">
+                                    <li>• SkipList：高效的并发读写</li>
+                                    <li>• 布隆过滤器：快速存在性检测</li>
+                                    <li>• FlatBuffers：高效的序列化格式</li>
+                                    <li>• Arena分配器：减少内存碎片</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">并发模型</h4>
+                                <ul class="text-sm text-gray-700 mt-2 space-y-1">
+                                    <li>• Goroutine池：控制并发度</li>
+                                    <li>• Channel通信：解耦组件间通信</li>
+                                    <li>• 读写锁：保护共享数据结构</li>
+                                    <li>• 原子操作：高性能计数器</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold mb-4">性能调优要点</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-800">内存管理</h4>
+                                <p class="text-sm text-gray-700 mt-2">合理设置MemTable大小和数量</p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">压缩策略</h4>
+                                <p class="text-sm text-gray-700 mt-2">平衡写放大和读放大</p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">缓存配置</h4>
+                                <p class="text-sm text-gray-700 mt-2">根据工作负载调整缓存大小</p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">并发控制</h4>
+                                <p class="text-sm text-gray-700 mt-2">优化锁粒度和持有时间</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">可扩展性考虑</h3>
+                    
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <h4 class="text-lg font-semibold mb-4">水平扩展</h4>
+                            <ul class="space-y-2 text-gray-700">
+                                <li><strong>分片策略</strong>：按键范围或哈希分片</li>
+                                <li><strong>一致性哈希</strong>：支持节点动态增减</li>
+                                <li><strong>副本机制</strong>：数据冗余和故障恢复</li>
+                                <li><strong>负载均衡</strong>：请求分发和热点处理</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <h4 class="text-lg font-semibold mb-4">垂直扩展</h4>
+                            <ul class="space-y-2 text-gray-700">
+                                <li><strong>多核利用</strong>：并发压缩和刷盘</li>
+                                <li><strong>内存优化</strong>：缓存策略和内存池</li>
+                                <li><strong>磁盘优化</strong>：SSD优化和并行IO</li>
+                                <li><strong>网络优化</strong>：批量传输和压缩</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 总结 -->
+            <section id="conclusion" class="section fade-in">
+                <h2 class="text-3xl font-bold text-gray-900 mb-6">总结</h2>
+                
+                <div class="bg-white p-8 rounded-lg shadow-sm border border-gray-200 mb-8">
+                    <p class="text-lg text-gray-700 mb-6">
+                        Badger数据库通过精心设计的分层架构和优化策略，实现了高性能的键值存储系统。
+                        其核心特点包括：
+                    </p>
+                    
+                    <div class="grid md:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <h3 class="text-lg font-semibold mb-3 text-blue-600">核心特性</h3>
+                            <ul class="space-y-2 text-gray-700">
+                                <li>• 基于LSM树的存储引擎</li>
+                                <li>• WiscKey键值分离设计</li>
+                                <li>• 完整的ACID事务支持</li>
+                                <li>• 智能压缩策略</li>
+                                <li>• 纯Go实现</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-lg font-semibold mb-3 text-green-600">技术优势</h3>
+                            <ul class="space-y-2 text-gray-700">
+                                <li>• 高效的写入性能</li>
+                                <li>• 合理的读取性能</li>
+                                <li>• SSI隔离级别</li>
+                                <li>• 数据一致性保证</li>
+                                <li>• 空间效率优化</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="success-card">
+                        <h3 class="text-lg font-semibold mb-2">学习价值</h3>
+                        <p class="text-gray-700">
+                            通过深入理解Badger的数据流转机制和实现细节，可以为构建类似的高性能存储系统
+                            提供宝贵的参考和指导。其设计思想和实现技巧对于理解现代数据库系统具有重要意义。
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+    
+    <!-- 返回顶部按钮 -->
+    <button class="back-to-top fixed bottom-6 right-6 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors duration-200 hidden" onclick="scrollToTop()">
+        <span class="material-symbols-outlined">keyboard_arrow_up</span>
+    </button>
+    
+    <!-- JavaScript -->
+    <script>
+        // 初始化Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#3b82f6',
+                primaryTextColor: '#1f2937',
+                primaryBorderColor: '#e5e7eb',
+                lineColor: '#6b7280',
+                secondaryColor: '#f8fafc',
+                tertiaryColor: '#f1f5f9'
+            }
+        });
+        
+        // 侧边栏切换
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.classList.toggle('open');
+        }
+        
+        // 子菜单切换
+        function toggleSubmenu(id) {
+            const submenu = document.getElementById(id);
+            const icon = submenu.previousElementSibling.querySelector('.material-symbols-outlined');
+            
+            submenu.classList.toggle('hidden');
+            icon.textContent = submenu.classList.contains('hidden') ? 'expand_more' : 'expand_less';
+        }
+        
+        // 导航高亮
+        function updateActiveNav() {
+            const sections = document.querySelectorAll('.section');
+            const navItems = document.querySelectorAll('.nav-item');
+            
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (scrollY >= (sectionTop - 200)) {
+                    current = section.getAttribute('id');
+                }
+            });
+            
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('href') === '#' + current) {
+                    item.classList.add('active');
+                }
+            });
+        }
+        
+        // 平滑滚动
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+        
+        // 搜索功能
+        function performSearch() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const content = document.querySelector('.main-content');
+            
+            // 清除之前的高亮
+            content.innerHTML = content.innerHTML.replace(/<mark class="search-highlight">(.*?)<\/mark>/gi, '$1');
+            
+            if (searchTerm.length > 2) {
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                content.innerHTML = content.innerHTML.replace(regex, '<mark class="search-highlight">$1</mark>');
+            }
+        }
+        
+        document.getElementById('searchInput').addEventListener('input', performSearch);
+        
+        // 返回顶部
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+        
+        // 打印页面
+        function printPage() {
+            window.print();
+        }
+        
+        // 主题切换（简单实现）
+        function toggleTheme() {
+            document.body.classList.toggle('dark-theme');
+        }
+        
+        // 滚动事件监听
+        window.addEventListener('scroll', () => {
+            updateActiveNav();
+            
+            // 返回顶部按钮显示/隐藏
+            const backToTop = document.querySelector('.back-to-top');
+            if (window.scrollY > 300) {
+                backToTop.classList.remove('hidden');
+            } else {
+                backToTop.classList.add('hidden');
+            }
+        });
+        
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            updateActiveNav();
+            
+            // 为所有代码块添加复制按钮
+            document.querySelectorAll('pre code').forEach(block => {
+                const button = document.createElement('button');
+                button.className = 'absolute top-2 right-2 bg-gray-700 text-white px-2 py-1 rounded text-xs hover:bg-gray-600';
+                button.textContent = '复制';
+                button.onclick = () => {
+                    navigator.clipboard.writeText(block.textContent);
+                    button.textContent = '已复制';
+                    setTimeout(() => button.textContent = '复制', 2000);
+                };
+                
+                const pre = block.parentElement;
+                pre.style.position = 'relative';
+                pre.appendChild(button);
+            });
+        });
+        
+        // 响应式处理
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) {
+                document.querySelector('.sidebar').classList.remove('open');
+            }
+        });
+    </script>
+</body>
+</html>
